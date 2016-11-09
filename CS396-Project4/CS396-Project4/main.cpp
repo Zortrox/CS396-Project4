@@ -2,15 +2,25 @@
 //Allegro test
 
 #include <stdio.h>
+#include <iostream>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
 
 #include "physics.h"
+#include "phys_object.h"
+#include "globals.h"
 
 #define FPS 60
 
 enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
+
+void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject*> &vecObjects, int x, int y) {
+	vecObjects.push_back(new PhysObject(sprite, sim->addBody(1.0f * 100 / PHYS_PIX, 1.0f * 500 / PHYS_PIX)));
+	b2Vec2 dir = (b2Vec2(x, y) - b2Vec2(100, 500));
+	dir *= 1.0f / 5;
+	vecObjects.back()->fire(dir);
+}
 
 int main(int argc, char **argv) {
 	ALLEGRO_DISPLAY *display = NULL;
@@ -40,6 +50,7 @@ int main(int argc, char **argv) {
 		al_destroy_timer(timer);
 		return -1;
 	}
+	al_hide_mouse_cursor(display);
 
 	if (!al_init_primitives_addon()) {
 		fprintf(stderr, "failed to initialize primitives!\n");
@@ -53,14 +64,6 @@ int main(int argc, char **argv) {
 
 	if (!al_install_mouse()) {
 		fprintf(stderr, "failed to initialize the mouse!\n");
-		return -1;
-	}
-
-	ALLEGRO_BITMAP *bouncer = al_create_bitmap(5, 5);
-	if (!bouncer) {
-		fprintf(stderr, "failed to create bouncer bitmap!\n");
-		al_destroy_display(display);
-		al_destroy_timer(timer);
 		return -1;
 	}
 
@@ -79,16 +82,20 @@ int main(int argc, char **argv) {
 
 	ALLEGRO_FONT* font = al_create_builtin_font();
 
-	al_hide_mouse_cursor(display);
-
+	ALLEGRO_BITMAP* bouncer = al_create_bitmap(5, 5);
 	al_set_target_bitmap(bouncer);
 	al_clear_to_color(al_map_rgb(255, 0, 255));
+
+	ALLEGRO_BITMAP* box = al_create_bitmap(30, 30);
+	al_set_target_bitmap(box);
+	al_draw_rectangle(0, 0, 30, 30, al_map_rgb(0, 255, 0), 2);
 
 	al_set_target_bitmap(al_get_backbuffer(display));
 	al_clear_to_color(al_map_rgb(0, 0, 0));
 	al_flip_display();
 
-	Physics sim;
+	Physics* sim = new Physics();
+	std::vector<PhysObject*> vecObjects;
 
 	al_start_timer(timer);
 	while (!quit)
@@ -107,6 +114,17 @@ int main(int argc, char **argv) {
 
 			cursorX = ev.mouse.x;
 			cursorY = ev.mouse.y;
+		}
+		else if (ev.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
+			switch (ev.mouse.button) {
+			case 1:
+				fireCannonball(box, sim, vecObjects, cursorX, cursorY);
+				break;
+			case 2:
+				vecObjects.push_back(new PhysObject(box, sim->addBody(1.0f * cursorX / PHYS_PIX, 1.0f * cursorY / PHYS_PIX)));
+				break;
+			}
+			
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
 			switch (ev.keyboard.keycode) {
@@ -155,8 +173,11 @@ int main(int argc, char **argv) {
 			al_clear_to_color(al_map_rgb(0, 0, 0));
 			al_draw_text(font, al_map_rgb(255, 255, 255), 400, 300, ALLEGRO_ALIGN_CENTER, "Welcome to Allegro!");
 
-			sim.step(1.0f/FPS);
-			sim.draw(display);
+			sim->step(1.0f/FPS);
+			
+			for each (PhysObject* obj in vecObjects) {
+				obj->draw(display);
+			}
 
 			al_draw_bitmap(bouncer, cursorX, cursorY, 0);
 
