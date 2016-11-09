@@ -9,7 +9,7 @@ public:
 	~PhysObject();
 
 	void draw(ALLEGRO_DISPLAY* display);
-	void fire(b2Vec2 impulse);
+	void fire(b2Vec2 velocity);
 
 private:
 	ALLEGRO_BITMAP* m_sprite;

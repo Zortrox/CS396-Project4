@@ -77,6 +77,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
+    <Allegro_AddonFont>true</Allegro_AddonFont>
+    <Allegro_LibraryType>DynamicDebug</Allegro_LibraryType>
+    <Allegro_AddonImage>true</Allegro_AddonImage>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

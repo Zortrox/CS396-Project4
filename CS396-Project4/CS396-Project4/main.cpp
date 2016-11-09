@@ -6,20 +6,23 @@
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_image.h>
 
 #include "physics.h"
 #include "phys_object.h"
 #include "globals.h"
 
 #define FPS 60
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+#define CANNON_X 100
+#define CANNON_Y 500
 
 enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
 
-void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject*> &vecObjects, int x, int y) {
-	vecObjects.push_back(new PhysObject(sprite, sim->addBody(1.0f * 100 / PHYS_PIX, 1.0f * 500 / PHYS_PIX)));
-	b2Vec2 dir = (b2Vec2(x, y) - b2Vec2(100, 500));
-	dir *= 1.0f / 5;
-	vecObjects.back()->fire(dir);
+void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject*> &vecObjects, int x, int y, b2Vec2 velocity) {
+	vecObjects.push_back(new PhysObject(sprite, sim->addCircle(x, y, 10)));
+	vecObjects.back()->fire(velocity);
 }
 
 int main(int argc, char **argv) {
@@ -32,6 +35,10 @@ int main(int argc, char **argv) {
 	bool keys[5];
 	int cursorX = 0;
 	int cursorY = 0;
+	bool drawCannonPull = false;
+	int cannonballX = 0;
+	int cannonballY = 0;
+	b2Vec2 cannonballVel = b2Vec2(0, 0);
 
 	if (!al_init()) {
 		fprintf(stderr, "failed to initialize allegro!\n");
@@ -44,7 +51,10 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	display = al_create_display(800, 600);
+	//al_set_new_bitmap_flags(ALLEGRO_MIN_LINEAR | ALLEGRO_MAG_LINEAR);
+	//al_set_new_display_option(ALLEGRO_SAMPLE_BUFFERS, 1, ALLEGRO_SUGGEST);
+	//al_set_new_display_option(ALLEGRO_SAMPLES, 8, ALLEGRO_SUGGEST);
+	display = al_create_display(WINDOW_WIDTH, WINDOW_HEIGHT);
 	if (!display) {
 		fprintf(stderr, "failed to create display!\n");
 		al_destroy_timer(timer);
@@ -54,6 +64,11 @@ int main(int argc, char **argv) {
 
 	if (!al_init_primitives_addon()) {
 		fprintf(stderr, "failed to initialize primitives!\n");
+		return -1;
+	}
+
+	if (!al_init_image_addon()) {
+		fprintf(stderr, "failed to initialize image addon!\n");
 		return -1;
 	}
 
@@ -82,13 +97,19 @@ int main(int argc, char **argv) {
 
 	ALLEGRO_FONT* font = al_create_builtin_font();
 
-	ALLEGRO_BITMAP* bouncer = al_create_bitmap(5, 5);
-	al_set_target_bitmap(bouncer);
+	ALLEGRO_BITMAP* bmpCursor = al_create_bitmap(5, 5);
+	al_set_target_bitmap(bmpCursor);
 	al_clear_to_color(al_map_rgb(255, 0, 255));
 
-	ALLEGRO_BITMAP* box = al_create_bitmap(30, 30);
-	al_set_target_bitmap(box);
-	al_draw_rectangle(0, 0, 30, 30, al_map_rgb(0, 255, 0), 2);
+	ALLEGRO_BITMAP* bmpStone = al_load_bitmap("assets/stone.jpg");
+	ALLEGRO_BITMAP* bmpBox = al_create_bitmap(30, 30);
+	al_set_target_bitmap(bmpBox);
+	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
+	//al_draw_rectangle(0, 0, 30, 30, al_map_rgb(0, 0, 0), 2);
+
+	ALLEGRO_BITMAP* bmpCannonball = al_create_bitmap(26, 26);
+	al_set_target_bitmap(bmpCannonball);
+	al_draw_circle(13, 13, 10, al_map_rgb(255, 0, 0), 1);
 
 	al_set_target_bitmap(al_get_backbuffer(display));
 	al_clear_to_color(al_map_rgb(0, 0, 0));
@@ -118,13 +139,20 @@ int main(int argc, char **argv) {
 		else if (ev.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
 			switch (ev.mouse.button) {
 			case 1:
-				fireCannonball(box, sim, vecObjects, cursorX, cursorY);
+				drawCannonPull = true;
 				break;
 			case 2:
-				vecObjects.push_back(new PhysObject(box, sim->addBody(1.0f * cursorX / PHYS_PIX, 1.0f * cursorY / PHYS_PIX)));
+				vecObjects.push_back(new PhysObject(bmpBox, sim->addBox(cursorX, cursorY, 30, 30)));
 				break;
 			}
-			
+		}
+		else if (ev.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP) {
+			switch (ev.mouse.button) {
+			case 1:
+				drawCannonPull = false;
+				fireCannonball(bmpCannonball, sim, vecObjects, cannonballX, cannonballY, cannonballVel);
+				break;
+			}
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
 			switch (ev.keyboard.keycode) {
@@ -170,16 +198,47 @@ int main(int argc, char **argv) {
 
 		if (redraw && al_event_queue_is_empty(event_queue)) {
 			redraw = false;
-			al_clear_to_color(al_map_rgb(0, 0, 0));
-			al_draw_text(font, al_map_rgb(255, 255, 255), 400, 300, ALLEGRO_ALIGN_CENTER, "Welcome to Allegro!");
+			al_clear_to_color(al_map_rgb(173, 196, 234));
+			//al_draw_text(font, al_map_rgb(255, 255, 255), 400, 300, ALLEGRO_ALIGN_CENTER, "Welcome to Allegro!");
 
 			sim->step(1.0f/FPS);
-			
+
+			al_draw_filled_rectangle(0, WINDOW_HEIGHT - 15, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgb(23, 68, 9));
+
 			for each (PhysObject* obj in vecObjects) {
 				obj->draw(display);
 			}
 
-			al_draw_bitmap(bouncer, cursorX, cursorY, 0);
+			if (drawCannonPull) {
+				b2Vec2 dir = (b2Vec2(cursorX, cursorY) - b2Vec2(100, 500));
+				float32 dist = dir.Normalize();
+				cannonballVel = dir;
+
+				if (dist > 80) dist = 80;
+				dir *= dist;
+				cannonballX = CANNON_X + dir.x;
+				cannonballY = CANNON_Y + dir.y;
+
+				cannonballVel *= -dist / 3;
+
+				b2Vec2 currPoint = b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX);
+				for (int i = 0; i < 180; i++) {
+					b2Vec2 nextPoint = sim->getTrajectoryPoint(b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX),
+						cannonballVel, i);
+					al_draw_line(currPoint.x * PHYS_PIX, currPoint.y * PHYS_PIX, nextPoint.x * PHYS_PIX, nextPoint.y * PHYS_PIX,
+						al_map_rgb(255, 255, 255), 1);
+					currPoint = nextPoint;
+				}
+
+				al_draw_line(CANNON_X, CANNON_Y, cannonballX, cannonballY, al_map_rgb(80, 80, 10), 2);
+				al_draw_line(CANNON_X, CANNON_Y, CANNON_X, WINDOW_HEIGHT, al_map_rgb(63, 0, 0), 5);
+				al_draw_bitmap(bmpCannonball, cannonballX - 13, cannonballY - 13, false);
+			}
+			else {
+				al_draw_line(CANNON_X, CANNON_Y, CANNON_X, WINDOW_HEIGHT, al_map_rgb(63, 0, 0), 5);
+			}
+			
+			al_draw_bitmap(bmpCursor, cursorX, cursorY, 0);
 
 			al_flip_display();
 		}

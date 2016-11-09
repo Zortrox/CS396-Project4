@@ -19,7 +19,7 @@ void PhysObject::draw(ALLEGRO_DISPLAY * display) {
 	al_draw_rotated_bitmap(m_sprite, width / 2, width / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
 }
 
-void PhysObject::fire(b2Vec2 impulse)
+void PhysObject::fire(b2Vec2 velocity)
 {
-	m_body->ApplyLinearImpulse(impulse, m_body->GetWorldCenter(), true);
+	m_body->SetLinearVelocity(velocity);
 }
