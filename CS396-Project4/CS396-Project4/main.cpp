@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
 			al_clear_to_color(al_map_rgb(0, 0, 0));
 			al_draw_text(font, al_map_rgb(255, 255, 255), 400, 300, ALLEGRO_ALIGN_CENTER, "Welcome to Allegro!");
 
-			sim.step(1.0f / 60.0f);
+			sim.step(1.0f/FPS);
 			sim.draw(display);
 
 			al_draw_bitmap(bouncer, cursorX, cursorY, 0);
