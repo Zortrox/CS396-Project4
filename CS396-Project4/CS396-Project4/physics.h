@@ -11,6 +11,7 @@ public:
 	void step(float32 dt);
 	b2Body* addBox(int x, int y, int width, int height);
 	b2Body* addCircle(int x, int y, int radius);
+	b2Body* addPlatform(int x, int y, int width, int height);
 	b2Vec2 getTrajectoryPoint(b2Vec2 &startingPosition, b2Vec2 &startingVelocity, float32 n);
 
 private:

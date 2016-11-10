@@ -4,6 +4,9 @@
 PhysObject::PhysObject(ALLEGRO_BITMAP* sprite, b2Body* body) {
 	m_sprite = sprite;
 	m_body = body;
+	m_physType = body->GetType();
+
+	m_body->SetUserData(this);
 }
 
 PhysObject::~PhysObject() {
@@ -23,4 +26,14 @@ void PhysObject::draw(ALLEGRO_DISPLAY * display) {
 void PhysObject::fire(b2Vec2 velocity)
 {
 	m_body->SetLinearVelocity(velocity);
+}
+
+void PhysObject::changeType(b2BodyType type) {
+	m_physType = type;
+}
+
+void PhysObject::setType() {
+	if (m_body->GetType() != m_physType) {
+		m_body->SetType(m_physType);
+	}
 }

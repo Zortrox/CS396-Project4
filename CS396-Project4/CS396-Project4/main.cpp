@@ -106,12 +106,14 @@ int main(int argc, char **argv) {
 	al_set_target_bitmap(bmpBox);
 	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
 	
+	ALLEGRO_BITMAP* bmpWood = al_load_bitmap("assets/wood.jpg");
 	ALLEGRO_BITMAP* bmpWall = al_create_bitmap(120, 30);
 	al_set_target_bitmap(bmpWall);
-	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
-	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 30, 0, 60, 30, false);
-	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 60, 0, 90, 30, false);
-	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 90, 0, 120, 30, false);
+	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 120, 30, false);
+
+	ALLEGRO_BITMAP* bmpPlatform = al_create_bitmap(150, 20);
+	al_set_target_bitmap(bmpPlatform);
+	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 150, 20, false);
 
 	ALLEGRO_BITMAP* bmpCannonball = al_create_bitmap(26, 26);
 	al_set_target_bitmap(bmpCannonball);
@@ -123,6 +125,9 @@ int main(int argc, char **argv) {
 
 	Physics* sim = new Physics();
 	std::vector<PhysObject*> vecObjects;
+	b2Body* platform = sim->addPlatform(200, 50, 150, 20);
+	platform->SetLinearVelocity(b2Vec2(-4, 0));
+	vecObjects.push_back(new PhysObject(bmpPlatform, platform));
 
 	al_start_timer(timer);
 	while (!quit)
@@ -214,8 +219,19 @@ int main(int argc, char **argv) {
 
 			al_draw_filled_rectangle(0, WINDOW_HEIGHT - 15, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgb(23, 68, 9));
 
+			
+			b2Vec2 posPlatform = platform->GetPosition();
+			b2Vec2 velPlatform = platform->GetLinearVelocity();
+			if (posPlatform.x > 1.0f * 700 / PHYS_PIX && velPlatform.x > 0 && platform->GetType() == b2_kinematicBody) {
+				platform->SetLinearVelocity(b2Vec2(-4, 0));
+			}
+			else if (posPlatform.x < 1.0f * 100 / PHYS_PIX && velPlatform.x < 0 && platform->GetType() == b2_kinematicBody) {
+				platform->SetLinearVelocity(b2Vec2(4, 0));
+			}
+
 			for each (PhysObject* obj in vecObjects) {
 				obj->draw(display);
+				obj->setType();
 			}
 
 			if (drawCannonPull) {
