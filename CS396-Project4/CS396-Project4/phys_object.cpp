@@ -15,8 +15,9 @@ void PhysObject::draw(ALLEGRO_DISPLAY * display) {
 	float32 ang = m_body->GetAngle();
 	b2Vec2 pos = m_body->GetPosition();
 	int width = al_get_bitmap_width(m_sprite);
+	int height = al_get_bitmap_height(m_sprite);
 
-	al_draw_rotated_bitmap(m_sprite, width / 2, width / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
+	al_draw_rotated_bitmap(m_sprite, width / 2, height / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
 }
 
 void PhysObject::fire(b2Vec2 velocity)

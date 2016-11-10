@@ -105,7 +105,13 @@ int main(int argc, char **argv) {
 	ALLEGRO_BITMAP* bmpBox = al_create_bitmap(30, 30);
 	al_set_target_bitmap(bmpBox);
 	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
-	//al_draw_rectangle(0, 0, 30, 30, al_map_rgb(0, 0, 0), 2);
+	
+	ALLEGRO_BITMAP* bmpWall = al_create_bitmap(120, 30);
+	al_set_target_bitmap(bmpWall);
+	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
+	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 30, 0, 60, 30, false);
+	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 60, 0, 90, 30, false);
+	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 90, 0, 120, 30, false);
 
 	ALLEGRO_BITMAP* bmpCannonball = al_create_bitmap(26, 26);
 	al_set_target_bitmap(bmpCannonball);
@@ -143,6 +149,9 @@ int main(int argc, char **argv) {
 				break;
 			case 2:
 				vecObjects.push_back(new PhysObject(bmpBox, sim->addBox(cursorX, cursorY, 30, 30)));
+				break;
+			case 3:
+				vecObjects.push_back(new PhysObject(bmpWall, sim->addBox(cursorX, cursorY, 120, 30)));
 				break;
 			}
 		}

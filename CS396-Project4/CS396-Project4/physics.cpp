@@ -26,7 +26,11 @@ void Physics::step(float32 dt) {
 	m_world->Step(dt, 8, 1);
 }
 
-b2Body* Physics::addBox(int x, int y, int width, int height = 0) {
+b2Body* Physics::addBox(int x, int y, int width, int height) {
+	//remove small buffer area from bitmaps
+	width -= 1;
+	height -= 1;
+
 	b2BodyDef boxBodyDef;
 	boxBodyDef.type = b2_dynamicBody;
 	boxBodyDef.position.Set(1.0f * x / PHYS_PIX, 1.0f * y / PHYS_PIX);
@@ -56,7 +60,7 @@ b2Body* Physics::addCircle(int x, int y, int radius) {
 	b2CircleShape circleShape;
 	circleShape.m_radius = 1.0f * radius / PHYS_PIX;
 	boxFixtureDef.shape = &circleShape;
-	boxFixtureDef.density = 1;
+	boxFixtureDef.density = 10;
 	boxBody->CreateFixture(&boxFixtureDef);
 
 	return boxBody;
