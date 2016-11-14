@@ -3,25 +3,30 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <string>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
 
 #include "physics.h"
 #include "phys_object.h"
+#include "platform.h"
+#include "person.h"
 #include "globals.h"
 
 #define FPS 60
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
+#define GAME_HEIGHT 525
 #define CANNON_X 100
-#define CANNON_Y 500
+#define CANNON_Y 400
 
 enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
 
 void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject*> &vecObjects, int x, int y, b2Vec2 velocity) {
-	vecObjects.push_back(new PhysObject(sprite, sim->addCircle(x, y, 10)));
+	vecObjects.push_back(new PhysObject(sprite, sim->addCircle(x, y, 10), OBJ_BALL));
 	vecObjects.back()->fire(velocity);
 }
 
@@ -31,14 +36,34 @@ int main(int argc, char **argv) {
 	ALLEGRO_TIMER *timer = NULL;
 	bool redraw = true;
 	bool quit = false;
+	bool bWin = false;
 
 	bool keys[5];
+	bool bDisplayMenu = false;
 	int cursorX = 0;
 	int cursorY = 0;
+	int cursorClickX = 0;
+	int cursorClickY = 0;
 	bool drawCannonPull = false;
 	int cannonballX = 0;
 	int cannonballY = 0;
+	b2Vec2 slingDir = b2Vec2(0, 0);
 	b2Vec2 cannonballVel = b2Vec2(0, 0);
+
+	int groundHeight = 15;
+	int shotsLeft = 10;
+	int points = 0;
+
+	int menuWidth = 200;
+	std::vector<std::string> vecMenu;
+	vecMenu.push_back("Resume");
+	vecMenu.push_back("Restart");
+	vecMenu.push_back("Levels");
+	vecMenu.push_back("Quit");
+	int itemHover = -1;
+
+	std::vector<PhysObject*> vecObjects;
+	std::vector<Person*> vecPeople;
 
 	if (!al_init()) {
 		fprintf(stderr, "failed to initialize allegro!\n");
@@ -61,6 +86,9 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 	al_hide_mouse_cursor(display);
+
+	al_init_font_addon();
+	al_init_ttf_addon();
 
 	if (!al_init_primitives_addon()) {
 		fprintf(stderr, "failed to initialize primitives!\n");
@@ -96,6 +124,9 @@ int main(int argc, char **argv) {
 	al_register_event_source(event_queue, al_get_keyboard_event_source());
 
 	ALLEGRO_FONT* font = al_create_builtin_font();
+	ALLEGRO_FONT* fontUI = al_load_font("assets/arial.ttf", 30, false);
+	ALLEGRO_FONT* fontMenuHeading = al_load_font("assets/arial.ttf", 20, false);
+	ALLEGRO_FONT* fontMenuItem = al_load_font("assets/arial.ttf", 16, false);
 
 	ALLEGRO_BITMAP* bmpCursor = al_create_bitmap(5, 5);
 	al_set_target_bitmap(bmpCursor);
@@ -115,19 +146,35 @@ int main(int argc, char **argv) {
 	al_set_target_bitmap(bmpPlatform);
 	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 150, 20, false);
 
+	ALLEGRO_BITMAP* bmpFurball = al_load_bitmap("assets/furball-64.png");
 	ALLEGRO_BITMAP* bmpCannonball = al_create_bitmap(26, 26);
 	al_set_target_bitmap(bmpCannonball);
-	al_draw_circle(13, 13, 10, al_map_rgb(255, 0, 0), 1);
+	al_draw_scaled_bitmap(bmpFurball, 0, 0, 64, 64, 0, 0, 26, 26, false);
+
+	ALLEGRO_BITMAP* bmpMammoth = al_load_bitmap("assets/mammoth-64.png");
+	ALLEGRO_BITMAP* bmpPerson = al_create_bitmap(33, 22);
+	al_set_target_bitmap(bmpPerson);
+	al_draw_scaled_bitmap(bmpMammoth, 0, 0, 99, 64, 0, 0, 33, 22, false);
+
+	ALLEGRO_BITMAP* bmpSlingFront = al_load_bitmap("assets/sling-front.png");
+	ALLEGRO_BITMAP* bmpSlingBack = al_load_bitmap("assets/sling-back.png");
 
 	al_set_target_bitmap(al_get_backbuffer(display));
 	al_clear_to_color(al_map_rgb(0, 0, 0));
 	al_flip_display();
 
-	Physics* sim = new Physics();
-	std::vector<PhysObject*> vecObjects;
-	b2Body* platform = sim->addPlatform(200, 50, 150, 20);
-	platform->SetLinearVelocity(b2Vec2(-4, 0));
-	vecObjects.push_back(new PhysObject(bmpPlatform, platform));
+	Physics* sim = new Physics(WINDOW_WIDTH, GAME_HEIGHT - groundHeight);
+	PhysObject* physGround = new PhysObject(NULL, sim->addGround(), OBJ_STRUCTURE);
+
+	Platform* platform = new Platform(bmpPlatform, sim->addPlatform(200, 50, 150, 20));
+	platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
+	Person* platformPerson = new Person(bmpPerson, sim->addBox(200, 0, 33, 22));
+	b2Joint* joint = sim->addJoint(platform->getBody(), platformPerson->getBody());
+
+	vecPeople.push_back(platformPerson);
+	vecPeople.push_back(new Person(bmpPerson, sim->addBox(200, GAME_HEIGHT - 20, 33, 22)));
+	vecPeople.push_back(new Person(bmpPerson, sim->addBox(300, GAME_HEIGHT - 50, 33, 22)));
+	vecPeople.push_back(new Person(bmpPerson, sim->addBox(400, GAME_HEIGHT - 200, 33, 22)));
 
 	al_start_timer(timer);
 	while (!quit)
@@ -150,21 +197,43 @@ int main(int argc, char **argv) {
 		else if (ev.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN) {
 			switch (ev.mouse.button) {
 			case 1:
-				drawCannonPull = true;
+				if (shotsLeft > 0 && !bDisplayMenu) {
+					drawCannonPull = true;
+					cursorClickX = ev.mouse.x;
+					cursorClickY = ev.mouse.y;
+				}
 				break;
 			case 2:
-				vecObjects.push_back(new PhysObject(bmpBox, sim->addBox(cursorX, cursorY, 30, 30)));
+				vecObjects.push_back(new PhysObject(bmpBox, sim->addBox(cursorX, cursorY, 30, 30), OBJ_STRUCTURE));
 				break;
 			case 3:
-				vecObjects.push_back(new PhysObject(bmpWall, sim->addBox(cursorX, cursorY, 120, 30)));
+				vecObjects.push_back(new PhysObject(bmpWall, sim->addBox(cursorX, cursorY, 120, 30), OBJ_STRUCTURE));
 				break;
 			}
 		}
 		else if (ev.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP) {
 			switch (ev.mouse.button) {
 			case 1:
-				drawCannonPull = false;
-				fireCannonball(bmpCannonball, sim, vecObjects, cannonballX, cannonballY, cannonballVel);
+				if (drawCannonPull && !bDisplayMenu) {
+					drawCannonPull = false;
+					fireCannonball(bmpCannonball, sim, vecObjects, cannonballX, cannonballY, cannonballVel);
+					shotsLeft--;
+				}
+				else if (bDisplayMenu && itemHover != -1) {
+					std::string text = vecMenu.at(itemHover);
+					if (text == "Resume") {
+						bDisplayMenu = false;
+					}
+					else if (text == "Restart") {
+
+					}
+					else if (text == "Levels") {
+
+					}
+					else if (text == "Quit") {
+						quit = true;
+					}
+				}
 				break;
 			}
 		}
@@ -204,9 +273,9 @@ int main(int argc, char **argv) {
 			case ALLEGRO_KEY_RIGHT:
 				keys[KEY_RIGHT] = false;
 				break;
-
 			case ALLEGRO_KEY_ESCAPE:
-				quit = true;
+				bDisplayMenu = !bDisplayMenu;
+				break;
 			}
 		}
 
@@ -215,34 +284,53 @@ int main(int argc, char **argv) {
 			al_clear_to_color(al_map_rgb(173, 196, 234));
 			//al_draw_text(font, al_map_rgb(255, 255, 255), 400, 300, ALLEGRO_ALIGN_CENTER, "Welcome to Allegro!");
 
-			sim->step(1.0f/FPS);
+			if (!bDisplayMenu) {
+				sim->step(1.0f / FPS);
+			}
 
-			al_draw_filled_rectangle(0, WINDOW_HEIGHT - 15, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgb(23, 68, 9));
-
+			//draw grass
+			al_draw_filled_rectangle(0, GAME_HEIGHT - groundHeight, WINDOW_WIDTH, GAME_HEIGHT, al_map_rgb(23, 68, 9));
 			
-			b2Vec2 posPlatform = platform->GetPosition();
-			b2Vec2 velPlatform = platform->GetLinearVelocity();
-			if (posPlatform.x > 1.0f * 700 / PHYS_PIX && velPlatform.x > 0 && platform->GetType() == b2_kinematicBody) {
-				platform->SetLinearVelocity(b2Vec2(-4, 0));
+			b2Vec2 posPlatform = platform->getBody()->GetPosition();
+			b2Vec2 velPlatform = platform->getBody()->GetLinearVelocity();
+			if (posPlatform.x > 1.0f * (WINDOW_WIDTH - 100) / PHYS_PIX && velPlatform.x > 0 && platform->getBody()->GetType() == b2_kinematicBody) {
+				platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
 			}
-			else if (posPlatform.x < 1.0f * 100 / PHYS_PIX && velPlatform.x < 0 && platform->GetType() == b2_kinematicBody) {
-				platform->SetLinearVelocity(b2Vec2(4, 0));
+			else if (posPlatform.x < 1.0f * 100 / PHYS_PIX  && velPlatform.x < 0 && platform->getBody()->GetType() == b2_kinematicBody) {
+				platform->getBody()->SetLinearVelocity(b2Vec2(4, 0));
 			}
 
+			platform->draw(display);
 			for each (PhysObject* obj in vecObjects) {
 				obj->draw(display);
-				obj->setType();
+			}
+			int numDead = 0;
+			for each (Person* obj in vecPeople) {
+				obj->draw(display);
+				points += obj->calcPoints();
+				if (obj->getDestroyed()) numDead++;
+			}
+			if (numDead == vecPeople.size()) {
+				bWin = true;
+			}
+
+			if (platform->setType()) {
+				sim->destroyJoint(joint);
 			}
 
 			if (drawCannonPull) {
-				b2Vec2 dir = (b2Vec2(cursorX, cursorY) - b2Vec2(100, 500));
-				float32 dist = dir.Normalize();
-				cannonballVel = dir;
+				if (!bDisplayMenu) {
+					slingDir = (b2Vec2(cursorX, cursorY) - b2Vec2(CANNON_X, CANNON_Y));
+				}
+				float32 dist = slingDir.Normalize();
+				cannonballVel = slingDir;
 
 				if (dist > 80) dist = 80;
-				dir *= dist;
-				cannonballX = CANNON_X + dir.x;
-				cannonballY = CANNON_Y + dir.y;
+				slingDir *= dist;
+				if (!bDisplayMenu) {
+					cannonballX = CANNON_X + slingDir.x;
+					cannonballY = CANNON_Y + slingDir.y;
+				}
 
 				cannonballVel *= -dist / 3;
 
@@ -255,14 +343,75 @@ int main(int argc, char **argv) {
 					currPoint = nextPoint;
 				}
 
-				al_draw_line(CANNON_X, CANNON_Y, cannonballX, cannonballY, al_map_rgb(80, 80, 10), 2);
-				al_draw_line(CANNON_X, CANNON_Y, CANNON_X, WINDOW_HEIGHT, al_map_rgb(63, 0, 0), 5);
+				b2Vec2 bandLength = slingDir;
+				bandLength.Normalize();
+				bandLength *= 13;
+
+				//slingshot
+				al_draw_scaled_bitmap(bmpSlingBack, 0, 0, 43, 275, CANNON_X - 3, CANNON_Y - 18, 22, 138, false);
+				al_draw_line(CANNON_X + 10, CANNON_Y, cannonballX + (bandLength.x), cannonballY + (bandLength.y), al_map_rgb(51, 25, 8), 4);
+				
+
+				//ball
 				al_draw_bitmap(bmpCannonball, cannonballX - 13, cannonballY - 13, false);
+
+				al_draw_line(CANNON_X - 10, CANNON_Y, cannonballX + (bandLength.x), cannonballY + (bandLength.y), al_map_rgb(51, 25, 8), 4);
+				al_draw_scaled_bitmap(bmpSlingFront, 0, 0, 50, 138, CANNON_X - 20, CANNON_Y - 21, 25, 69, false);
+
+				
 			}
 			else {
-				al_draw_line(CANNON_X, CANNON_Y, CANNON_X, WINDOW_HEIGHT, al_map_rgb(63, 0, 0), 5);
+				al_draw_scaled_bitmap(bmpSlingBack, 0, 0, 43, 275, CANNON_X - 3, CANNON_Y - 18, 22, 138, false);
+				al_draw_scaled_bitmap(bmpSlingFront, 0, 0, 50, 138, CANNON_X - 20, CANNON_Y - 21, 25, 69, false);
 			}
 			
+			//draw UI
+			al_draw_filled_rectangle(0, WINDOW_HEIGHT - 78, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgb(211, 255, 242));
+			al_draw_filled_rectangle(0, WINDOW_HEIGHT - 80, WINDOW_WIDTH, WINDOW_HEIGHT - 75, al_map_rgb(12, 175, 129));
+
+			std::string txtShots = std::to_string(shotsLeft) + " shots left";
+			std::string txtPoints = "Score: " + std::to_string(points);
+			al_draw_text(fontUI, al_map_rgb(0, 0, 0), 10, WINDOW_HEIGHT - 53, false, txtShots.c_str());
+			al_draw_text(fontUI, al_map_rgb(0, 0, 0), WINDOW_WIDTH - 250, WINDOW_HEIGHT - 53, false, txtPoints.c_str());
+
+			//draw menu
+			if (bDisplayMenu) {
+				int menuHeight = vecMenu.size() * 40 + 80;
+
+				al_draw_filled_rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgba(0, 0, 0, 150));
+				al_draw_filled_rectangle(WINDOW_WIDTH / 2 - menuWidth / 2, WINDOW_HEIGHT / 2 - menuHeight / 2, WINDOW_WIDTH / 2 + menuWidth / 2, WINDOW_HEIGHT / 2 + menuHeight / 2, al_map_rgb(100, 100, 100));
+				al_draw_text(fontMenuHeading, al_map_rgb(255, 255, 255), WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 - menuHeight / 2 + 10, ALLEGRO_ALIGN_CENTER, "Menu");
+
+				itemHover = -1;
+				int yPos = WINDOW_HEIGHT / 2 - menuHeight / 2 + 60;
+				int index = 0;
+				for each (std::string item in vecMenu) {
+					ALLEGRO_COLOR boxColor;
+					ALLEGRO_COLOR textColor;
+
+					int x1 = WINDOW_WIDTH / 2 - menuWidth / 2 + 20;
+					int x2 = WINDOW_WIDTH / 2 + menuWidth / 2 - 20;
+					int y1 = yPos;
+					int y2 = yPos + 30;
+
+					if (cursorX >= x1 && cursorX <= x2 && cursorY >= y1 && cursorY <= y2) {
+						boxColor = al_map_rgb(255, 255, 255);
+						textColor = al_map_rgb(0, 0, 0);
+						itemHover = index;
+					}
+					else {
+						boxColor = al_map_rgb(0, 0, 0);
+						textColor = al_map_rgb(255, 255, 255);
+					}
+
+					al_draw_filled_rounded_rectangle(x1, y1, x2, y2, 5, 5, boxColor);
+					al_draw_text(fontMenuItem, textColor, WINDOW_WIDTH / 2, y1 + 8, ALLEGRO_ALIGN_CENTER, item.c_str());
+					yPos += 40;
+					index++;
+				}
+			}
+
+			//draw cursor
 			al_draw_bitmap(bmpCursor, cursorX, cursorY, 0);
 
 			al_flip_display();

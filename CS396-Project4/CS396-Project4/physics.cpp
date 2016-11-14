@@ -3,22 +3,13 @@
 #include "contact_listener.h"
 #include <allegro5\allegro_primitives.h>
 
-Physics::Physics() {
+Physics::Physics(int width, int height) {
 	m_gravity.Set(0.0f, 9.8f);
 	m_world = new b2World(m_gravity);
 	m_world->SetContactListener(new ContactListener());
 
-	b2BodyDef groundBodyDef;
-	groundBodyDef.type = b2_staticBody;
-	groundBodyDef.position.Set(0, 19.5);
-	groundBodyDef.angle = 0;
-	m_groundBody = m_world->CreateBody(&groundBodyDef);
-	b2PolygonShape groundShape;
-	groundShape.SetAsBox(27, 0.0f);
-	b2FixtureDef groundFixtureDef;
-	groundFixtureDef.shape = &groundShape;
-	groundFixtureDef.density = 1;
-	m_groundBody->CreateFixture(&groundFixtureDef);
+	m_worldWidth = 1.0f * width / PHYS_PIX;
+	m_worldHeight = 1.0f * height / PHYS_PIX;
 }
 Physics::~Physics() {
 
@@ -28,7 +19,25 @@ void Physics::step(float32 dt) {
 	m_world->Step(dt, 8, 1);
 }
 
-b2Body* Physics::addBox(int x, int y, int width, int height) {
+b2Body* Physics::addGround() {
+	b2BodyDef groundBodyDef;
+	groundBodyDef.type = b2_staticBody;
+	groundBodyDef.position.Set(m_worldWidth / 2, m_worldHeight + 1.0f);
+	groundBodyDef.angle = 0;
+	vecBodies.push_back(m_world->CreateBody(&groundBodyDef));
+	b2Body* groundBody = vecBodies.back();
+
+	b2PolygonShape groundShape;
+	groundShape.SetAsBox(m_worldWidth / 2, 1.0f);
+	b2FixtureDef groundFixtureDef;
+	groundFixtureDef.shape = &groundShape;
+	groundFixtureDef.density = 1;
+	groundBody->CreateFixture(&groundFixtureDef);
+
+	return groundBody;
+}
+
+b2Body* Physics::addBox(int x, int y, int width, int height, float32 density, float32 friction) {
 	//remove small buffer area from bitmaps
 	width -= 1;
 	height -= 1;
@@ -44,7 +53,8 @@ b2Body* Physics::addBox(int x, int y, int width, int height) {
 	b2PolygonShape boxShape;
 	boxShape.SetAsBox(1.0f * width / (PHYS_PIX * 2), 1.0f * height / (PHYS_PIX * 2));
 	boxFixtureDef.shape = &boxShape;
-	boxFixtureDef.density = 1;
+	boxFixtureDef.density = density;
+	boxFixtureDef.friction = friction;
 	boxBody->CreateFixture(&boxFixtureDef);
 
 	return boxBody;
@@ -86,6 +96,19 @@ b2Body* Physics::addPlatform(int x, int y, int width, int height) {
 	movingBody->CreateFixture(&movingFixtureDef);
 
 	return movingBody;
+}
+
+b2Joint * Physics::addJoint(b2Body * bodyA, b2Body * bodyB) {
+	b2WeldJointDef jointDef;
+	jointDef.bodyA = bodyA;
+	jointDef.bodyB = bodyB;
+	jointDef.collideConnected = true;
+
+	return m_world->CreateJoint(&jointDef);
+}
+
+void Physics::destroyJoint(b2Joint * joint) {
+	m_world->DestroyJoint(joint);
 }
 
 b2Vec2 Physics::getTrajectoryPoint(b2Vec2 &startingPosition, b2Vec2 &startingVelocity, float32 n)

@@ -75,6 +75,7 @@
     <Allegro_AddonFont>true</Allegro_AddonFont>
     <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
     <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonTTF>true</Allegro_AddonTTF>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -89,6 +90,7 @@
     <Allegro_AddonFont>true</Allegro_AddonFont>
     <Allegro_AddonPrimitives>true</Allegro_AddonPrimitives>
     <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonTTF>true</Allegro_AddonTTF>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -156,8 +158,10 @@
   <ItemGroup>
     <ClCompile Include="contact_listener.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="person.cpp" />
     <ClCompile Include="physics.cpp" />
     <ClCompile Include="phys_object.cpp" />
+    <ClCompile Include="platform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -165,8 +169,10 @@
   <ItemGroup>
     <ClInclude Include="contact_listener.h" />
     <ClInclude Include="globals.h" />
+    <ClInclude Include="person.h" />
     <ClInclude Include="physics.h" />
     <ClInclude Include="phys_object.h" />
+    <ClInclude Include="platform.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
