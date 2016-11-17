@@ -83,6 +83,7 @@
     <Allegro_AddonFont>true</Allegro_AddonFont>
     <Allegro_LibraryType>DynamicDebug</Allegro_LibraryType>
     <Allegro_AddonImage>true</Allegro_AddonImage>
+    <Allegro_AddonTTF>true</Allegro_AddonTTF>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>

@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <sstream>
+#include <iterator>
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
@@ -24,6 +27,83 @@
 #define CANNON_Y 400
 
 enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
+enum spriteCodes { SPR_PERSON, SPR_BOX, SPR_WALL, SPR_MAX_SIZE };
+
+//trim string
+std::string trim(std::string &str)
+{
+	if (str != "") {
+		size_t first = str.find_first_not_of(" \t");
+		size_t last = str.find_last_not_of(" \t");
+		return str.substr(first, (last - first + 1));
+	}
+	else {
+		return "";
+	}
+}
+
+std::vector<std::string> split(std::string &str) {
+	if (str == "") {
+		return std::vector<std::string>();
+	}
+
+	std::stringstream ss(str);
+	std::istream_iterator<std::string> begin(ss);
+	std::istream_iterator<std::string> end;
+	std::vector<std::string> vecArguments(begin, end);
+
+	return vecArguments;
+}
+
+bool loadLevel(std::string filename, Physics* sim, std::vector<PhysObject*> &vecObjects, std::vector<Person*> &vecPeople, std::vector<ALLEGRO_BITMAP*> &vecSprites) {
+	bool tutorialLevel = false;
+	std::ifstream file(filename);
+
+	if (!file) {
+		std::cout << "Failed opening file:" << filename << std::endl;
+	}
+	else {
+		std::string line;
+		int lineNumber = 1;
+		while (std::getline(file, line)) {
+			line = trim(line);
+
+			if (lineNumber == 1 && line == "true") {
+				tutorialLevel = true;
+			}
+			else {
+				std::vector<std::string> vecArguments = split(line);
+
+				if (vecArguments.size() > 0) {
+					int x = std::stoi(vecArguments.at(1));
+					int y = 0;
+					size_t indexY = vecArguments.at(2).find('-');
+					if (indexY == -1) {
+						y = std::stoi(vecArguments.at(2));
+					}
+					else {
+						y = GAME_HEIGHT - std::stoi(vecArguments.at(2).substr(indexY + 1));
+					}
+
+					if (vecArguments.at(0) == "wall") {
+						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_WALL), sim->addBox(x, y, 120, 30), OBJ_STRUCTURE));
+					}
+					else if (vecArguments.at(0) == "wallr") {
+
+					}
+					else if (vecArguments.at(0) == "box") {
+						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_BOX), sim->addBox(x, y, 30, 30), OBJ_STRUCTURE));
+					}
+					else if (vecArguments.at(0) == "person") {
+						vecPeople.push_back(new Person(vecSprites.at(SPR_PERSON), sim->addBox(x, y, 33, 22)));
+					}
+				}
+			}
+		}
+	}
+
+	return tutorialLevel;
+}
 
 void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject*> &vecObjects, int x, int y, b2Vec2 velocity) {
 	vecObjects.push_back(new PhysObject(sprite, sim->addCircle(x, y, 10), OBJ_BALL));
@@ -61,9 +141,6 @@ int main(int argc, char **argv) {
 	vecMenu.push_back("Levels");
 	vecMenu.push_back("Quit");
 	int itemHover = -1;
-
-	std::vector<PhysObject*> vecObjects;
-	std::vector<Person*> vecPeople;
 
 	if (!al_init()) {
 		fprintf(stderr, "failed to initialize allegro!\n");
@@ -166,15 +243,31 @@ int main(int argc, char **argv) {
 	Physics* sim = new Physics(WINDOW_WIDTH, GAME_HEIGHT - groundHeight);
 	PhysObject* physGround = new PhysObject(NULL, sim->addGround(), OBJ_STRUCTURE);
 
-	Platform* platform = new Platform(bmpPlatform, sim->addPlatform(200, 50, 150, 20));
-	platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
-	Person* platformPerson = new Person(bmpPerson, sim->addBox(200, 0, 33, 22));
-	b2Joint* joint = sim->addJoint(platform->getBody(), platformPerson->getBody());
+	//level object storage
+	std::vector<PhysObject*> vecObjects;
+	std::vector<Person*> vecPeople;
+	std::vector<ALLEGRO_BITMAP*> vecSprites;
 
-	vecPeople.push_back(platformPerson);
-	vecPeople.push_back(new Person(bmpPerson, sim->addBox(200, GAME_HEIGHT - 20, 33, 22)));
-	vecPeople.push_back(new Person(bmpPerson, sim->addBox(300, GAME_HEIGHT - 50, 33, 22)));
-	vecPeople.push_back(new Person(bmpPerson, sim->addBox(400, GAME_HEIGHT - 200, 33, 22)));
+	//add bitmaps to vector
+	vecSprites.resize(SPR_MAX_SIZE);
+	vecSprites.at(SPR_BOX) = bmpBox;
+	vecSprites.at(SPR_PERSON) = bmpPerson;
+	vecSprites.at(SPR_WALL) = bmpWall;
+
+	//tutorial variables
+	Platform* platform;
+	Person* platformPerson;
+	b2Joint* joint;
+
+	//load level from file
+	bool tutorial = loadLevel("levels/level1.lvl", sim, vecObjects, vecPeople, vecSprites);
+	if (tutorial) {
+		platform = new Platform(bmpPlatform, sim->addPlatform(200, 50, 150, 20));
+		platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
+		platformPerson = new Person(bmpPerson, sim->addBox(200, 0, 33, 22));
+		joint = sim->addJoint(platform->getBody(), platformPerson->getBody());
+		vecPeople.push_back(platformPerson);
+	}
 
 	al_start_timer(timer);
 	while (!quit)

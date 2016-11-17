@@ -1,0 +1,13 @@
+true
+
+person 200 h-20
+person 300 h-50
+person 400 h-200
+person 430 h-250
+person 410 h-100
+person 420 h-50
+
+wall 500 400
+wallr 600 400
+
+box 500 200
