@@ -27,7 +27,13 @@
 #define CANNON_Y 400
 
 enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
-enum spriteCodes { SPR_PERSON, SPR_BOX, SPR_WALL, SPR_MAX_SIZE };
+enum spriteCodes { SPR_PERSON, SPR_BOX, SPR_WALL, SPR_PLATFORM, SPR_MAX_SIZE };
+
+struct TutorialVars {
+	Platform* platform = NULL;
+	Person* platformPerson = NULL;
+	b2Joint* joint = NULL;
+};
 
 //trim string
 std::string trim(std::string &str)
@@ -43,7 +49,7 @@ std::string trim(std::string &str)
 }
 
 std::vector<std::string> split(std::string &str) {
-	if (str == "") {
+	if (str == "" || str.at(0) == '#') {
 		return std::vector<std::string>();
 	}
 
@@ -55,7 +61,32 @@ std::vector<std::string> split(std::string &str) {
 	return vecArguments;
 }
 
-bool loadLevel(std::string filename, Physics* sim, std::vector<PhysObject*> &vecObjects, std::vector<Person*> &vecPeople, std::vector<ALLEGRO_BITMAP*> &vecSprites) {
+void resetLevel(TutorialVars &tVars, Physics* sim, std::vector<PhysObject*> &vecObjects, std::vector<Person*> &vecPeople) {
+	if (tVars.platform) {
+		delete tVars.platform;
+		tVars.platform = NULL;
+	}
+	if (tVars.platformPerson) {
+		//actual data will be delete when looping in people vector
+		tVars.platformPerson = NULL;
+	}
+	//the joint is removed from the physics when the bodies are removed anyways
+	tVars.joint = NULL;
+
+	//remove all objects
+	for each (PhysObject* obj in vecObjects) {
+		delete obj;
+	}
+	vecObjects.clear();
+
+	//remove all people
+	for each (Person* person in vecPeople) {
+		delete person;
+	}
+	vecPeople.clear();
+}
+
+bool loadLevel(std::string filename, Physics* sim, std::vector<PhysObject*> &vecObjects, std::vector<Person*> &vecPeople, std::vector<ALLEGRO_BITMAP*> &vecSprites, TutorialVars &tVars) {
 	bool tutorialLevel = false;
 	std::ifstream file(filename);
 
@@ -86,19 +117,27 @@ bool loadLevel(std::string filename, Physics* sim, std::vector<PhysObject*> &vec
 					}
 
 					if (vecArguments.at(0) == "wall") {
-						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_WALL), sim->addBox(x, y, 120, 30), OBJ_STRUCTURE));
+						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_WALL), sim->addBox(x, y, 120, 15, 0, 5), OBJ_STRUCTURE));
 					}
 					else if (vecArguments.at(0) == "wallr") {
-
+						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_WALL), sim->addBox(x, y, 120, 15, 3.14159f / 2, 5), OBJ_STRUCTURE));
 					}
 					else if (vecArguments.at(0) == "box") {
-						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_BOX), sim->addBox(x, y, 30, 30), OBJ_STRUCTURE));
+						vecObjects.push_back(new PhysObject(vecSprites.at(SPR_BOX), sim->addBox(x, y, 30, 30, 0, 2), OBJ_STRUCTURE));
 					}
 					else if (vecArguments.at(0) == "person") {
 						vecPeople.push_back(new Person(vecSprites.at(SPR_PERSON), sim->addBox(x, y, 33, 22)));
 					}
 				}
 			}
+		}
+
+		if (tutorialLevel) {
+			tVars.platform = new Platform(vecSprites.at(SPR_PLATFORM), sim->addPlatform(200, 50, 150, 20));
+			tVars.platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
+			tVars.platformPerson = new Person(vecSprites.at(SPR_PERSON), sim->addBox(200, 0, 33, 22));
+			tVars.joint = sim->addJoint(tVars.platform->getBody(), tVars.platformPerson->getBody());
+			vecPeople.push_back(tVars.platformPerson);
 		}
 	}
 
@@ -215,13 +254,13 @@ int main(int argc, char **argv) {
 	al_draw_scaled_bitmap(bmpStone, 0, 0, 512, 512, 0, 0, 30, 30, false);
 	
 	ALLEGRO_BITMAP* bmpWood = al_load_bitmap("assets/wood.jpg");
-	ALLEGRO_BITMAP* bmpWall = al_create_bitmap(120, 30);
+	ALLEGRO_BITMAP* bmpWall = al_create_bitmap(120, 15);
 	al_set_target_bitmap(bmpWall);
-	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 120, 30, false);
+	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 32, 0, 0, 120, 15, false);
 
 	ALLEGRO_BITMAP* bmpPlatform = al_create_bitmap(150, 20);
 	al_set_target_bitmap(bmpPlatform);
-	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 150, 20, false);
+	al_draw_scaled_bitmap(bmpWood, 0, 0, 256, 64, 0, 0, 150, 30, false);
 
 	ALLEGRO_BITMAP* bmpFurball = al_load_bitmap("assets/furball-64.png");
 	ALLEGRO_BITMAP* bmpCannonball = al_create_bitmap(26, 26);
@@ -253,21 +292,14 @@ int main(int argc, char **argv) {
 	vecSprites.at(SPR_BOX) = bmpBox;
 	vecSprites.at(SPR_PERSON) = bmpPerson;
 	vecSprites.at(SPR_WALL) = bmpWall;
+	vecSprites.at(SPR_PLATFORM) = bmpPlatform;
 
 	//tutorial variables
-	Platform* platform;
-	Person* platformPerson;
-	b2Joint* joint;
+	TutorialVars tVars;
 
 	//load level from file
-	bool tutorial = loadLevel("levels/level1.lvl", sim, vecObjects, vecPeople, vecSprites);
-	if (tutorial) {
-		platform = new Platform(bmpPlatform, sim->addPlatform(200, 50, 150, 20));
-		platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
-		platformPerson = new Person(bmpPerson, sim->addBox(200, 0, 33, 22));
-		joint = sim->addJoint(platform->getBody(), platformPerson->getBody());
-		vecPeople.push_back(platformPerson);
-	}
+	std::string strLevelFilename = "levels/level1.lvl";
+	bool bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
 
 	al_start_timer(timer);
 	while (!quit)
@@ -318,10 +350,20 @@ int main(int argc, char **argv) {
 						bDisplayMenu = false;
 					}
 					else if (text == "Restart") {
-
+						resetLevel(tVars, sim, vecObjects, vecPeople);
+						bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
 					}
 					else if (text == "Levels") {
-
+						if (bTutorial) {
+							strLevelFilename = "levels/level2.lvl";
+							resetLevel(tVars, sim, vecObjects, vecPeople);
+							bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
+						}
+						else {
+							strLevelFilename = "levels/level1.lvl";
+							resetLevel(tVars, sim, vecObjects, vecPeople);
+							bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
+						}
 					}
 					else if (text == "Quit") {
 						quit = true;
@@ -383,20 +425,30 @@ int main(int argc, char **argv) {
 
 			//draw grass
 			al_draw_filled_rectangle(0, GAME_HEIGHT - groundHeight, WINDOW_WIDTH, GAME_HEIGHT, al_map_rgb(23, 68, 9));
-			
-			b2Vec2 posPlatform = platform->getBody()->GetPosition();
-			b2Vec2 velPlatform = platform->getBody()->GetLinearVelocity();
-			if (posPlatform.x > 1.0f * (WINDOW_WIDTH - 100) / PHYS_PIX && velPlatform.x > 0 && platform->getBody()->GetType() == b2_kinematicBody) {
-				platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
-			}
-			else if (posPlatform.x < 1.0f * 100 / PHYS_PIX  && velPlatform.x < 0 && platform->getBody()->GetType() == b2_kinematicBody) {
-				platform->getBody()->SetLinearVelocity(b2Vec2(4, 0));
+
+			//draw tutorial platform
+			if (bTutorial) {
+				b2Vec2 posPlatform = tVars.platform->getBody()->GetPosition();
+				b2Vec2 velPlatform = tVars.platform->getBody()->GetLinearVelocity();
+				if (posPlatform.x > 1.0f * (WINDOW_WIDTH - 100) / PHYS_PIX && velPlatform.x > 0 && tVars.platform->getBody()->GetType() == b2_kinematicBody) {
+					tVars.platform->getBody()->SetLinearVelocity(b2Vec2(-4, 0));
+				}
+				else if (posPlatform.x < 1.0f * 100 / PHYS_PIX  && velPlatform.x < 0 && tVars.platform->getBody()->GetType() == b2_kinematicBody) {
+					tVars.platform->getBody()->SetLinearVelocity(b2Vec2(4, 0));
+				}
+
+				tVars.platform->draw(display);
+				if (tVars.platform->setType()) {
+					sim->destroyJoint(tVars.joint);
+				}
 			}
 
-			platform->draw(display);
+			//draw all objects
 			for each (PhysObject* obj in vecObjects) {
 				obj->draw(display);
 			}
+
+			//draw people
 			int numDead = 0;
 			for each (Person* obj in vecPeople) {
 				obj->draw(display);
@@ -405,10 +457,6 @@ int main(int argc, char **argv) {
 			}
 			if (numDead == vecPeople.size()) {
 				bWin = true;
-			}
-
-			if (platform->setType()) {
-				sim->destroyJoint(joint);
 			}
 
 			if (drawCannonPull) {
@@ -469,7 +517,7 @@ int main(int argc, char **argv) {
 
 			//draw menu
 			if (bDisplayMenu) {
-				int menuHeight = vecMenu.size() * 40 + 80;
+				int menuHeight = (int)vecMenu.size() * 40 + 80;
 
 				al_draw_filled_rectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, al_map_rgba(0, 0, 0, 150));
 				al_draw_filled_rectangle(WINDOW_WIDTH / 2 - menuWidth / 2, WINDOW_HEIGHT / 2 - menuHeight / 2, WINDOW_WIDTH / 2 + menuWidth / 2, WINDOW_HEIGHT / 2 + menuHeight / 2, al_map_rgb(100, 100, 100));

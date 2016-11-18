@@ -1,0 +1,33 @@
+#left wall
+wallr 600 h-65
+wallr 615 h-65
+wallr 600 h-205
+wallr 615 h-205
+
+#first platform
+wall 650 h-127
+
+#right wall
+wallr 690 h-65
+wallr 705 h-65
+wallr 690 h-205
+wallr 705 h-205
+
+#top platform
+wall 650 h-272
+
+#palisades
+box 600 h-278
+box 700 h-278
+
+#front area
+wall 500 h-20
+wall 500 h-40
+box 455 h-60
+box 455 h-80
+
+#people
+person 500 h-45
+person 650 h-280
+person 650 h-140
+person 650 h-20

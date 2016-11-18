@@ -17,6 +17,8 @@ PhysObject::PhysObject() {
 }
 
 PhysObject::~PhysObject() {
+	//remove physics body when object deleted
+	m_body->GetWorld()->DestroyBody(m_body);
 }
 
 void PhysObject::draw(ALLEGRO_DISPLAY * display) {
@@ -27,9 +29,11 @@ void PhysObject::draw(ALLEGRO_DISPLAY * display) {
 	int width = al_get_bitmap_width(m_sprite);
 	int height = al_get_bitmap_height(m_sprite);
 
-	al_draw_rotated_bitmap(m_sprite, width / 2, height / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
 	if (m_destroyed) {
-		al_draw_filled_circle(pos.x * PHYS_PIX, pos.y * PHYS_PIX, width / 4, al_map_rgb(255, 0, 0));
+		al_draw_tinted_rotated_bitmap(m_sprite, al_map_rgba(50, 0, 0, 200), width / 2, height / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
+	}
+	else {
+		al_draw_rotated_bitmap(m_sprite, width / 2, height / 2, pos.x * PHYS_PIX, pos.y * PHYS_PIX, ang, false);
 	}
 }
 

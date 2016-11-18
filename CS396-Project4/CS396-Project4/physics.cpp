@@ -28,7 +28,7 @@ b2Body* Physics::addGround() {
 	b2Body* groundBody = vecBodies.back();
 
 	b2PolygonShape groundShape;
-	groundShape.SetAsBox(m_worldWidth / 2, 1.0f);
+	groundShape.SetAsBox(m_worldWidth * 2, 1.0f);
 	b2FixtureDef groundFixtureDef;
 	groundFixtureDef.shape = &groundShape;
 	groundFixtureDef.density = 1;
@@ -37,7 +37,7 @@ b2Body* Physics::addGround() {
 	return groundBody;
 }
 
-b2Body* Physics::addBox(int x, int y, int width, int height, float32 density, float32 friction) {
+b2Body* Physics::addBox(int x, int y, int width, int height, float32 angle, float32 density, float32 friction) {
 	//remove small buffer area from bitmaps
 	width -= 1;
 	height -= 1;
@@ -45,7 +45,7 @@ b2Body* Physics::addBox(int x, int y, int width, int height, float32 density, fl
 	b2BodyDef boxBodyDef;
 	boxBodyDef.type = b2_dynamicBody;
 	boxBodyDef.position.Set(1.0f * x / PHYS_PIX, 1.0f * y / PHYS_PIX);
-	boxBodyDef.angle = 0;
+	boxBodyDef.angle = angle;
 	vecBodies.push_back(m_world->CreateBody(&boxBodyDef));
 	b2Body* boxBody = vecBodies.back();
 

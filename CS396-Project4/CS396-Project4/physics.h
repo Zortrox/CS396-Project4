@@ -10,7 +10,7 @@ public:
 	~Physics();
 	void step(float32 dt);
 	b2Body* addGround();
-	b2Body* addBox(int x, int y, int width, int height, float32 density = 1.0f, float32 friction = 1.0f);
+	b2Body* addBox(int x, int y, int width, int height, float32 angle = 0.0f, float32 density = 1.0f, float32 friction = 1.0f);
 	b2Body* addCircle(int x, int y, int radius);
 	b2Body* addPlatform(int x, int y, int width, int height);
 	b2Joint* addJoint(b2Body* bodyA, b2Body* bodyB);
