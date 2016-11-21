@@ -12,6 +12,7 @@
 #include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_native_dialog.h>
 
 #include "physics.h"
 #include "phys_object.h"
@@ -25,8 +26,9 @@
 #define GAME_HEIGHT 525
 #define CANNON_X 100
 #define CANNON_Y 400
+#define MAX_SHOTS 10
 
-enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
+//enum keyCodes { KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT };
 enum spriteCodes { SPR_PERSON, SPR_BOX, SPR_WALL, SPR_PLATFORM, SPR_MAX_SIZE };
 
 struct TutorialVars {
@@ -150,14 +152,15 @@ void fireCannonball(ALLEGRO_BITMAP* sprite, Physics* sim, std::vector<PhysObject
 }
 
 int main(int argc, char **argv) {
-	ALLEGRO_DISPLAY *display = NULL;
-	ALLEGRO_EVENT_QUEUE *event_queue = NULL;
-	ALLEGRO_TIMER *timer = NULL;
+	ALLEGRO_DISPLAY* display = NULL;
+	ALLEGRO_EVENT_QUEUE* event_queue = NULL;
+	ALLEGRO_TIMER* timer = NULL;
+	ALLEGRO_TIMER* loseTimer = NULL;
 	bool redraw = true;
 	bool quit = false;
 	bool bWin = false;
+	bool bLose = false;
 
-	bool keys[5];
 	bool bDisplayMenu = false;
 	int cursorX = 0;
 	int cursorY = 0;
@@ -168,9 +171,10 @@ int main(int argc, char **argv) {
 	int cannonballY = 0;
 	b2Vec2 slingDir = b2Vec2(0, 0);
 	b2Vec2 cannonballVel = b2Vec2(0, 0);
+	bool bDrawPath = false;
 
 	int groundHeight = 15;
-	int shotsLeft = 10;
+	int shotsLeft = MAX_SHOTS;
 	int points = 0;
 
 	int menuWidth = 200;
@@ -188,6 +192,11 @@ int main(int argc, char **argv) {
 
 	timer = al_create_timer(1.0 / FPS);
 	if (!timer) {
+		fprintf(stderr, "failed to create timer!\n");
+		return -1;
+	}
+	loseTimer = al_create_timer(5.0f);
+	if (!loseTimer) {
 		fprintf(stderr, "failed to create timer!\n");
 		return -1;
 	}
@@ -216,6 +225,12 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	if (!al_init_native_dialog_addon()) {
+		fprintf(stderr, "failed to initialize dialog addon!\n");
+		return -1;
+	}
+	ALLEGRO_FILECHOOSER* fileDialog = al_create_native_file_dialog("levels/", "Choose Level", "*.lvl", ALLEGRO_FILECHOOSER_FILE_MUST_EXIST);
+
 	if (!al_install_keyboard()) {
 		fprintf(stderr, "failed to initialize the keyboard!\n");
 		return -1;
@@ -231,11 +246,13 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "failed to create event_queue!\n");
 		al_destroy_display(display);
 		al_destroy_timer(timer);
+		al_destroy_timer(loseTimer);
 		return -1;
 	}
 
 	al_register_event_source(event_queue, al_get_display_event_source(display));
 	al_register_event_source(event_queue, al_get_timer_event_source(timer));
+	al_register_event_source(event_queue, al_get_timer_event_source(loseTimer));
 	al_register_event_source(event_queue, al_get_mouse_event_source());
 	al_register_event_source(event_queue, al_get_keyboard_event_source());
 
@@ -243,6 +260,7 @@ int main(int argc, char **argv) {
 	ALLEGRO_FONT* fontUI = al_load_font("assets/arial.ttf", 30, false);
 	ALLEGRO_FONT* fontMenuHeading = al_load_font("assets/arial.ttf", 20, false);
 	ALLEGRO_FONT* fontMenuItem = al_load_font("assets/arial.ttf", 16, false);
+	ALLEGRO_FONT* fontGameOver = al_load_font("assets/arial.ttf", 32, false);
 
 	ALLEGRO_BITMAP* bmpCursor = al_create_bitmap(5, 5);
 	al_set_target_bitmap(bmpCursor);
@@ -308,7 +326,14 @@ int main(int argc, char **argv) {
 		al_wait_for_event(event_queue, &ev);
 
 		if (ev.type == ALLEGRO_EVENT_TIMER) {
-			redraw = true;
+			if (ev.timer.source == timer) {
+				redraw = true;
+			}
+			else if (ev.timer.source == loseTimer) {
+				al_stop_timer(loseTimer);
+				if (!bWin) bLose = true;
+			}
+			
 		}
 		else if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
 			quit = true;
@@ -343,6 +368,9 @@ int main(int argc, char **argv) {
 					drawCannonPull = false;
 					fireCannonball(bmpCannonball, sim, vecObjects, cannonballX, cannonballY, cannonballVel);
 					shotsLeft--;
+					if (shotsLeft == 0) {
+						al_start_timer(loseTimer);
+					}
 				}
 				else if (bDisplayMenu && itemHover != -1) {
 					std::string text = vecMenu.at(itemHover);
@@ -351,18 +379,26 @@ int main(int argc, char **argv) {
 					}
 					else if (text == "Restart") {
 						resetLevel(tVars, sim, vecObjects, vecPeople);
+						shotsLeft = MAX_SHOTS;
+						points = 0;
+						bWin = false;
+						bLose = false;
 						bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
+						bDisplayMenu = false;
 					}
 					else if (text == "Levels") {
-						if (bTutorial) {
-							strLevelFilename = "levels/level2.lvl";
+						al_show_native_file_dialog(display, fileDialog);
+						const char* path = al_get_native_file_dialog_path(fileDialog, 0);
+
+						if (path) {
+							strLevelFilename = std::string(path);
 							resetLevel(tVars, sim, vecObjects, vecPeople);
+							shotsLeft = MAX_SHOTS;
+							points = 0;
+							bWin = false;
+							bLose = false;
 							bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
-						}
-						else {
-							strLevelFilename = "levels/level1.lvl";
-							resetLevel(tVars, sim, vecObjects, vecPeople);
-							bTutorial = loadLevel(strLevelFilename, sim, vecObjects, vecPeople, vecSprites, tVars);
+							bDisplayMenu = false;
 						}
 					}
 					else if (text == "Quit") {
@@ -373,40 +409,12 @@ int main(int argc, char **argv) {
 			}
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_DOWN) {
-			switch (ev.keyboard.keycode) {
-			case ALLEGRO_KEY_UP:
-				keys[KEY_UP] = true;
-				break;
-
-			case ALLEGRO_KEY_DOWN:
-				keys[KEY_DOWN] = true;
-				break;
-
-			case ALLEGRO_KEY_LEFT:
-				keys[KEY_LEFT] = true;
-				break;
-
-			case ALLEGRO_KEY_RIGHT:
-				keys[KEY_RIGHT] = true;
-				break;
-			}
+			
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_UP) {
 			switch (ev.keyboard.keycode) {
-			case ALLEGRO_KEY_UP:
-				keys[KEY_UP] = false;
-				break;
-
-			case ALLEGRO_KEY_DOWN:
-				keys[KEY_DOWN] = false;
-				break;
-
-			case ALLEGRO_KEY_LEFT:
-				keys[KEY_LEFT] = false;
-				break;
-
-			case ALLEGRO_KEY_RIGHT:
-				keys[KEY_RIGHT] = false;
+			case ALLEGRO_KEY_P:
+				bDrawPath = !bDrawPath;
 				break;
 			case ALLEGRO_KEY_ESCAPE:
 				bDisplayMenu = !bDisplayMenu;
@@ -456,7 +464,7 @@ int main(int argc, char **argv) {
 				if (obj->getDestroyed()) numDead++;
 			}
 			if (numDead == vecPeople.size()) {
-				bWin = true;
+				if (!bLose) bWin = true;
 			}
 
 			if (drawCannonPull) {
@@ -475,13 +483,16 @@ int main(int argc, char **argv) {
 
 				cannonballVel *= -dist / 3;
 
-				b2Vec2 currPoint = b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX);
-				for (int i = 0; i < 180; i++) {
-					b2Vec2 nextPoint = sim->getTrajectoryPoint(b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX),
-						cannonballVel, i);
-					al_draw_line(currPoint.x * PHYS_PIX, currPoint.y * PHYS_PIX, nextPoint.x * PHYS_PIX, nextPoint.y * PHYS_PIX,
-						al_map_rgb(255, 255, 255), 1);
-					currPoint = nextPoint;
+				//draw curved path
+				if (bDrawPath) {
+					b2Vec2 currPoint = b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX);
+					for (int i = 0; i < 180; i++) {
+						b2Vec2 nextPoint = sim->getTrajectoryPoint(b2Vec2(1.0f * cannonballX / PHYS_PIX, 1.0f * cannonballY / PHYS_PIX),
+							cannonballVel, i);
+						al_draw_line(currPoint.x * PHYS_PIX, currPoint.y * PHYS_PIX, nextPoint.x * PHYS_PIX, nextPoint.y * PHYS_PIX,
+							al_map_rgb(255, 255, 255), 1);
+						currPoint = nextPoint;
+					}
 				}
 
 				b2Vec2 bandLength = slingDir;
@@ -514,6 +525,16 @@ int main(int argc, char **argv) {
 			std::string txtPoints = "Score: " + std::to_string(points);
 			al_draw_text(fontUI, al_map_rgb(0, 0, 0), 10, WINDOW_HEIGHT - 53, false, txtShots.c_str());
 			al_draw_text(fontUI, al_map_rgb(0, 0, 0), WINDOW_WIDTH - 250, WINDOW_HEIGHT - 53, false, txtPoints.c_str());
+
+			//draw win/lose
+			if (bWin) {
+				al_draw_text(fontGameOver, al_map_rgb(0, 0, 0), WINDOW_WIDTH / 2, GAME_HEIGHT / 2 - 1, ALLEGRO_ALIGN_CENTER, "YOU WIN!");
+				al_draw_text(fontGameOver, al_map_rgb(0, 150, 0), WINDOW_WIDTH / 2, GAME_HEIGHT / 2, ALLEGRO_ALIGN_CENTER, "YOU WIN!");
+			}
+			if (bLose) {
+				al_draw_text(fontGameOver, al_map_rgb(0, 0, 0), WINDOW_WIDTH / 2, GAME_HEIGHT / 2 - 1, ALLEGRO_ALIGN_CENTER, "YOU LOSE!");
+				al_draw_text(fontGameOver, al_map_rgb(150, 0, 0), WINDOW_WIDTH / 2, GAME_HEIGHT / 2, ALLEGRO_ALIGN_CENTER, "YOU LOSE!");
+			}
 
 			//draw menu
 			if (bDisplayMenu) {
